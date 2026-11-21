@@ -132,12 +132,26 @@ Table of Contents
 
    Connecting IPv4 islands over an IPv6-only MPLS network is identified
    as a major gap in Section 3.3.2.1 of [RFC7439].
-   [I-D.mishra-idr-v4-islands-v6-core-4pe] describes a number of
-   deployment modes for such IPv4 Provider Edge (4PE) routers, and notes
-   that the modes in which IPv4 prefixes are not labeled may require
-   deeper inspection of the packet to determine the network layer
-   protocol so that packets are not dropped (see Sections 8.4 and 8.5 of
-   [I-D.mishra-idr-v4-islands-v6-core-4pe]).
+   [I-D.mishra-idr-v4-islands-v6-core-4pe] describes IPv4 Provider Edge
+   (4PE) routers for that purpose.  Most of its deployment options
+   (Section 8 of [I-D.mishra-idr-v4-islands-v6-core-4pe]) use the
+   approach described in Section 2.4, i.e., a second level of labels
+   that the egress PE advertises using BGP-LU.  For the two options in
+   which IPv4 packets carry a single label, it notes that deeper
+   inspection of the packet may be required to determine the network
+   layer protocol so that packets are not dropped (Sections 8.4 and 8.5
+   of [I-D.mishra-idr-v4-islands-v6-core-4pe]), but it does not specify
+   that inspection.
+
+   This document does not propose the same approach as
+   [I-D.mishra-idr-v4-islands-v6-core-4pe].  It builds more directly on
+   the approach to interconnecting IPv4 islands over an IPv6 backbone
+   that is described in Section 6.1 of [RFC8950], in which IPv4 unicast
+   routes are advertised without labels and with IPv6 next hops.  The
+   ingress PE resolves such a route, whose BGP next hop is the IPv6
+   loopback address of the egress PE, over the Prefix-SID that is bound
+   to that address, and no additional label is needed to identify IPv4
+   packets.
 
    This document introduces layer 3 awareness to the SR-MPLS data plane:
    depending on the configuration, the first hop, the penultimate hop,
