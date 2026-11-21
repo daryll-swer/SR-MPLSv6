@@ -3,8 +3,8 @@
 SR-MPLSv6: Segment Routing over MPLS with IPv6-only underlay and overlay — protocol specification, architecture and Internet-Draft development
 
 This repository contains the source of the Internet-Draft
-**draft-swer-spring-sr-mplsv6**, *Segment Routing over MPLS with IPv6-Only
-Underlay and Overlay (SR-MPLSv6)*, in RFC XML v3 format for
+**draft-swer-spring-sr-mplsv6**, *IPv4 Traffic over an IPv6-Only Segment
+Routing MPLS Underlay Network*, in RFC XML v3 format for
 [xml2rfc](https://pypi.org/project/xml2rfc/).
 
 Read the draft:
