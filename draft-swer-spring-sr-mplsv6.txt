@@ -751,5 +751,7 @@ Authors' Addresses
 
 
    Bryton Herdes
-   Cloudflare
+   Cloudflare, Inc.
+   Champaign, Illinois
+   United States of America
    Email: bryton@cloudflare.com

@@ -37,8 +37,13 @@ version="3">
     </author>
 
     <author fullname="Bryton Herdes" initials="B." surname="Herdes">
-      <organization>Cloudflare</organization>
+      <organization abbrev="Cloudflare">Cloudflare, Inc.</organization>
       <address>
+        <postal>
+          <city>Champaign</city>
+          <region>Illinois</region>
+          <country>United States of America</country>
+        </postal>
         <email>bryton@cloudflare.com</email>
       </address>
     </author>
