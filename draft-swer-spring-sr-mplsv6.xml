@@ -100,7 +100,14 @@ version="3">
       </t>
       <t>
         Connecting IPv4 islands over an IPv6-only MPLS network is identified as a major gap in <xref target="RFC7439" section="3.3.2.1"/>.
-        <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/> describes a number of deployment modes for such IPv4 Provider Edge (4PE) routers, and notes that the modes in which IPv4 prefixes are not labeled may require deeper inspection of the packet to determine the network layer protocol so that packets are not dropped (see Sections <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.4" sectionFormat="bare"/> and <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.5" sectionFormat="bare"/> of <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/>).
+        <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/> describes IPv4 Provider Edge (4PE) routers for that purpose.
+        Most of its deployment options (<xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8"/>) use the approach described in <xref target="workarounds"/>, i.e., a second level of labels that the egress PE advertises using BGP-LU.
+        For the two options in which IPv4 packets carry a single label, it notes that deeper inspection of the packet may be required to determine the network layer protocol so that packets are not dropped (Sections <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.4" sectionFormat="bare"/> and <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.5" sectionFormat="bare"/> of <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/>), but it does not specify that inspection.
+      </t>
+      <t>
+        This document does not propose the same approach as <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/>.
+        It builds more directly on the approach to interconnecting IPv4 islands over an IPv6 backbone that is described in <xref target="RFC8950" section="6.1"/>, in which IPv4 unicast routes are advertised without labels and with IPv6 next hops.
+        The ingress PE resolves such a route, whose BGP next hop is the IPv6 loopback address of the egress PE, over the Prefix-SID that is bound to that address, and no additional label is needed to identify IPv4 packets.
       </t>
       <t>
         This document introduces layer 3 awareness to the SR-MPLS data plane: depending on the configuration, the first hop, the penultimate hop, or the ultimate hop inspects the network layer header of the payload to determine its address family and acts accordingly.
