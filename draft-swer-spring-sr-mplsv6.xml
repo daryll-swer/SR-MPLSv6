@@ -30,8 +30,9 @@ version="3">
     <author fullname="Daryll Swer" initials="D." surname="Swer">
       <organization>Swer Networks</organization>
       <address>
-        <!-- TODO: add an email address before submission. -->
-        <uri>https://www.daryllswer.com/</uri>
+        <email>daryll@swernetworks.com</email>
+        <email>contact@daryllswer.com</email>
+        <uri>https://www.swernetworks.com</uri>
       </address>
     </author>
 
