@@ -746,7 +746,8 @@ Authors' Addresses
 
    Daryll Swer
    Swer Networks
-   URI:   https://www.daryllswer.com/
+   Email: daryll@swernetworks.com, contact@daryllswer.com
+   URI:   https://www.swernetworks.com
 
 
    Bryton Herdes
