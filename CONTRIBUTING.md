@@ -23,5 +23,9 @@ subject to a Simplified BSD License) in Contributions. See the
 - Authoring convention: one sentence per line, so that diffs stay reviewable.
 - Keep artwork within 69 columns so that it fits the 72-column text output.
 - Run `make` and `make idnits` before opening a pull request; CI runs both.
+- `make` refreshes the plain-text copy,
+  [`draft-swer-spring-sr-mplsv6.txt`](draft-swer-spring-sr-mplsv6.txt), when the
+  XML changes. Commit it together with the XML and do not edit it by hand; CI
+  fails if it is out of date.
 - Bump the revision in both `docName` and `<seriesInfo>` only when submitting a
   new version to the datatracker.

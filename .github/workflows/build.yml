@@ -29,6 +29,9 @@ jobs:
       - name: Render text, HTML, and expanded XML
         run: make all submit
 
+      - name: Check that the committed plain-text copy is up to date
+        run: make check-readable
+
       - name: Run idnits
         run: make idnits
 
@@ -36,4 +39,35 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: internet-draft
-          path: build/
+          path: |
+            build/
+            !build/readable/
+            !build/site/
+
+      - name: Assemble the editor's copy
+        run: make site
+
+      - name: Upload the editor's copy for GitHub Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/site/
+
+  deploy:
+    # Publish the editor's copy only from main; the github-pages environment
+    # also restricts deployments to main.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

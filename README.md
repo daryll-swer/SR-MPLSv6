@@ -7,6 +7,12 @@ This repository contains the source of the Internet-Draft
 Underlay and Overlay (SR-MPLSv6)*, in RFC XML v3 format for
 [xml2rfc](https://pypi.org/project/xml2rfc/).
 
+Read the draft:
+
+- [Editor's copy](https://next-hopself.github.io/SR-MPLSv6/) (HTML, published
+  from `main`)
+- [Plain text](draft-swer-spring-sr-mplsv6.txt), in this repository
+
 ## Summary
 
 SR-MPLS ([RFC 8660](https://www.rfc-editor.org/info/rfc8660)) does not specify
@@ -38,10 +44,15 @@ make idnits           # check the draft with idnits 3
 make submit           # build/draft-swer-spring-sr-mplsv6-00.xml (expanded, for upload)
 ```
 
-The expanded XML from `make submit` is the file to upload to the
-[datatracker](https://datatracker.ietf.org/submit/). CI renders the draft and
-runs idnits on pull requests and on pushes to `main`; the rendered files are
-attached to each run as the `internet-draft` artifact.
+`make` also refreshes the plain-text copy, `draft-swer-spring-sr-mplsv6.txt`,
+when the XML changes; commit it together with the XML. The expanded XML from
+`make submit` is the file to upload to the
+[datatracker](https://datatracker.ietf.org/submit/).
+
+CI renders the draft, checks that the plain-text copy is up to date, and runs
+idnits on pull requests and on pushes to `main`; the rendered files are
+attached to each run as the `internet-draft` artifact. Pushes to `main` also
+publish the editor's copy to GitHub Pages.
 
 ## Contributing
 
