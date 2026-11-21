@@ -37,8 +37,13 @@ version="3">
     </author>
 
     <author fullname="Bryton Herdes" initials="B." surname="Herdes">
-      <organization>Cloudflare</organization>
+      <organization abbrev="Cloudflare">Cloudflare, Inc.</organization>
       <address>
+        <postal>
+          <city>Champaign</city>
+          <region>Illinois</region>
+          <country>United States of America</country>
+        </postal>
         <email>bryton@cloudflare.com</email>
       </address>
     </author>
@@ -561,6 +566,13 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
           Whether the procedures are enabled by default or only by configuration.
         </li>
       </ol>
+    </section>
+
+    <section anchor="acknowledgements" numbered="false">
+      <name>Acknowledgements</name>
+      <t>
+        The authors wish to thank <contact fullname="Cathal Mooney"/> for his suggestions on this document.
+      </t>
     </section>
 
   </back>
