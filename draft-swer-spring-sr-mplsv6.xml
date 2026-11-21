@@ -568,5 +568,12 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
       </ol>
     </section>
 
+    <section anchor="acknowledgements" numbered="false">
+      <name>Acknowledgements</name>
+      <t>
+        The authors wish to thank <contact fullname="Cathal Mooney"/> for his suggestions on this document.
+      </t>
+    </section>
+
   </back>
 </rfc>
