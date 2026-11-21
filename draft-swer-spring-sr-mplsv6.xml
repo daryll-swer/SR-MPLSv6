@@ -1,0 +1,566 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!-- draft submitted in xml v3 -->
+
+<!DOCTYPE rfc [
+ <!ENTITY nbsp    "&#160;">
+ <!ENTITY zwsp   "&#8203;">
+ <!ENTITY nbhy   "&#8209;">
+ <!ENTITY wj     "&#8288;">
+]>
+
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+category="std"
+consensus="true"
+docName="draft-swer-spring-sr-mplsv6-00"
+ipr="trust200902"
+xml:lang="en"
+sortRefs="true"
+submissionType="IETF"
+symRefs="true"
+tocInclude="true"
+version="3">
+
+  <front>
+    <title abbrev="SR-MPLSv6">
+      Segment Routing over MPLS with IPv6-Only Underlay and Overlay (SR&nbhy;MPLSv6)
+    </title>
+    <seriesInfo name="Internet-Draft" value="draft-swer-spring-sr-mplsv6-00"/>
+
+    <author fullname="Daryll Swer" initials="D." surname="Swer">
+      <organization>Swer Networks</organization>
+      <address>
+        <!-- TODO: add an email address before submission. -->
+        <uri>https://www.daryllswer.com/</uri>
+      </address>
+    </author>
+
+    <author fullname="Bryton Herdes" initials="B." surname="Herdes">
+      <organization>Cloudflare</organization>
+      <address>
+        <email>bryton@cloudflare.com</email>
+      </address>
+    </author>
+
+    <date/>
+
+    <area>Routing</area>
+    <workgroup>SPRING</workgroup>
+
+    <keyword>Segment Routing</keyword>
+    <keyword>SR-MPLS</keyword>
+    <keyword>IPv6-only</keyword>
+    <keyword>Penultimate Hop Popping</keyword>
+    <keyword>Explicit NULL</keyword>
+
+    <abstract>
+      <t>
+        Segment Routing over MPLS (SR-MPLS) can be deployed with an IPv6-only underlay and overlay, in which the IGP links and the BGP sessions between Provider Edge (PE) routers are IPv6-only, the Prefix-SIDs of the PEs are attached to IPv6 prefixes, and IPv4 reachability is advertised with IPv6 next hops.
+        This document refers to such deployments as SR-MPLSv6.
+        Existing specifications do not define how a node that pops or replaces a Prefix-SID bound to an IPv6 prefix determines that the packet beneath it is IPv4.
+        This has led to non-interoperable implementations, and to the use of an additional label to identify IPv4 packets.
+        This document specifies payload address family awareness in the SR-MPLS data plane, so that IPv4 packets are delivered to the egress PE either with the correct link-layer protocol identifier (implicit NULL) or with the IPv4 Explicit NULL label (explicit NULL), without requiring an additional label.
+      </t>
+    </abstract>
+
+    <note removeInRFC="true">
+      <name>About This Document</name>
+      <t>
+        Comments are solicited and should be addressed to the SPRING Working Group mailing list (spring@ietf.org) and/or the authors.
+      </t>
+      <t>
+        Source for this draft and an issue tracker can be found at <eref target="https://github.com/daryll-swer/SR-MPLSv6"/>.
+      </t>
+    </note>
+  </front>
+
+  <middle>
+
+    <section anchor="intro">
+      <name>Introduction</name>
+      <t>
+        Segment Routing (SR) <xref target="RFC8402"/> over the MPLS data plane (SR-MPLS) is specified in <xref target="RFC8660"/>.
+        SR-MPLS can be deployed with an IPv6-only underlay and overlay: the point-to-point IGP links are IPv6-only, the Prefix-SIDs that identify Provider Edge (PE) routers are attached to their IPv6 loopback addresses, and the BGP sessions between PEs are IPv6-only.
+        IPv4 routing is then provided by advertising IPv4 Network Layer Reachability Information (NLRI) with IPv6 next hops <xref target="RFC8950"/>.
+        This document refers to such a deployment as SR-MPLSv6.
+      </t>
+      <t>
+        The existing specifications do not define how labeling is to work in SR-MPLSv6 when IPv4 packets are forwarded in the global routing table, i.e., without a service label.
+        Such packets are carried with the Prefix-SID label of the egress PE, which is bound to an IPv6 prefix, and the node that removes or replaces that label needs to determine that the packet beneath it is IPv4.
+        This lack of direction has led vendors to interpret the specifications in various non-interoperable ways.
+        Some implementations adopt an approach similar to IPv6 Provider Edge (6PE) <xref target="RFC4798"/>, in which BGP Labeled Unicast (BGP-LU) <xref target="RFC8277"/>, or a similar mechanism, provides an additional bottom-of-stack label, such as the IPv4 Explicit NULL label, to identify IPv4 packets.
+        That approach consumes label stack depth and forces explicit NULL behavior for all IPv4 traffic.
+        The only known exception is VRF-based services, in which the bottom-of-stack service label already identifies the forwarding context into which the egress PE delivers the packet, regardless of address family.
+      </t>
+      <t>
+        Connecting IPv4 islands over an IPv6-only MPLS network is identified as a major gap in <xref target="RFC7439" section="3.3.2.1"/>.
+        <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/> describes a number of deployment modes for such IPv4 Provider Edge (4PE) routers, and notes that the modes in which IPv4 prefixes are not labeled may require deeper inspection of the packet to determine the network layer protocol so that packets are not dropped (see Sections <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.4" sectionFormat="bare"/> and <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe" section="8.5" sectionFormat="bare"/> of <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/>).
+      </t>
+      <t>
+        This document introduces layer 3 awareness to the SR-MPLS data plane: depending on the configuration, the first hop, the penultimate hop, or the ultimate hop inspects the network layer header of the payload to determine its address family and acts accordingly.
+        <xref target="problem"/> describes the problem in detail, <xref target="procedures"/> specifies the procedures, and <xref target="topologies"/> illustrates the topologies that the procedures need to account for.
+      </t>
+
+      <section anchor="reqs-lang">
+        <name>Requirements Language</name>
+        <t>
+          The key words "<bcp14>MUST</bcp14>", "<bcp14>MUST NOT</bcp14>", "<bcp14>REQUIRED</bcp14>", "<bcp14>SHALL</bcp14>", "<bcp14>SHALL NOT</bcp14>", "<bcp14>SHOULD</bcp14>", "<bcp14>SHOULD NOT</bcp14>", "<bcp14>RECOMMENDED</bcp14>", "<bcp14>NOT RECOMMENDED</bcp14>", "<bcp14>MAY</bcp14>", and "<bcp14>OPTIONAL</bcp14>" in this document are to be interpreted as described in BCP&nbsp;14 <xref target="RFC2119"/> <xref target="RFC8174"/> when, and only when, they appear in all capitals, as shown here.
+        </t>
+      </section>
+
+      <section anchor="terminology">
+        <name>Terminology</name>
+        <t>
+          This document uses the terminology of <xref target="RFC3031"/>, <xref target="RFC8402"/>, and <xref target="RFC8660"/>.
+          The IPv4 Explicit NULL label (0), the IPv6 Explicit NULL label (2), and the Implicit NULL label (3) are defined in <xref target="RFC3032" section="2.1"/>.
+          In addition, the following terms are used:
+        </t>
+        <dl newline="false">
+          <dt>SR-MPLSv6:</dt>
+          <dd>
+            An SR-MPLS deployment in which the IGP underlay (point-to-point links and Prefix-SIDs) and the BGP overlay sessions between PEs are IPv6-only, and IPv4 reachability is provided by advertising IPv4 NLRI with IPv6 next hops <xref target="RFC8950"/>.
+            SR-MPLSv6 uses the MPLS data plane; it is distinct from Segment Routing over IPv6 (SRv6) <xref target="RFC8986"/>.
+          </dd>
+          <dt>First hop:</dt>
+          <dd>
+            The ingress PE, which receives a packet from a Customer Edge (CE) router, imposes the Prefix-SID label of the egress PE (the PUSH operation of <xref target="RFC8660"/>), and forwards the packet into the SR-MPLS domain.
+          </dd>
+          <dt>Transit node:</dt>
+          <dd>
+            A Label Switching Router (LSR) that swaps the Prefix-SID label (the CONTINUE operation of <xref target="RFC8660"/>).
+          </dd>
+          <dt>Penultimate hop:</dt>
+          <dd>
+            The upstream neighbor of the Prefix-SID originator along the path of the packet, i.e., the node immediately before the ultimate hop.
+          </dd>
+          <dt>Ultimate hop:</dt>
+          <dd>
+            The egress PE, which originates the Prefix-SID attached to its IPv6 loopback address and is the BGP next hop of the IPv4 route.
+          </dd>
+          <dt>Payload address family:</dt>
+          <dd>
+            The network layer protocol (IPv4 or IPv6) of the packet carried beneath the label stack.
+            This is distinct from the address family of the prefix to which the Prefix-SID is bound.
+          </dd>
+          <dt>PHP:</dt>
+          <dd>
+            Penultimate Hop Popping <xref target="RFC3031"/>.
+          </dd>
+        </dl>
+      </section>
+    </section>
+
+    <section anchor="problem">
+      <name>Problem Statement</name>
+      <t>
+        This section describes why existing specifications do not ensure that IPv4 packets carried over SR-MPLSv6 without a service label are delivered correctly, and the workarounds that are used today.
+      </t>
+
+      <section anchor="problem-protocol">
+        <name>Identifying the Network Layer Protocol of the Payload</name>
+        <t>
+          The MPLS label stack does not contain any field that explicitly identifies the network layer protocol of the payload.
+          Instead, the network layer protocol has to be inferable from the value of the label that is popped from the bottom of the stack, possibly along with the contents of the network layer header itself (<xref target="RFC3032" section="2.2"/>).
+          To that end, a label is either used only for packets of a particular network layer protocol, or used only for a specified set of network layer protocols whose packets can be distinguished by inspection of the network layer header; the same criteria apply to any label value that replaces it in transit.
+        </t>
+        <t>
+          In SR-MPLSv6, the first hop resolves an IPv4 route whose BGP next hop is the IPv6 loopback address of the ultimate hop <xref target="RFC8950"/>, and imposes the Prefix-SID label that is bound to that IPv6 prefix.
+          That label is therefore bound to an IPv6 prefix, but carries an IPv4 packet and has the S bit <xref target="RFC3032"/> set.
+          Neither <xref target="RFC8660"/> nor the IGP extensions for Segment Routing <xref target="RFC8667"/> <xref target="RFC8666"/> state whether such a label may carry IPv4 packets, nor how a node that pops or replaces the label determines the network layer protocol of the packet beneath it.
+        </t>
+      </section>
+
+      <section anchor="problem-php">
+        <name>Penultimate Hop Popping</name>
+        <t>
+          When the Prefix-SID is advertised with the P-Flag (No-PHP) clear, the penultimate hop pops the Prefix-SID (<xref target="RFC8667" section="2.1.1.3"/>).
+          If the popped label was the only label in the stack, the penultimate hop transmits an unlabeled packet to the ultimate hop, and has to identify its network layer protocol to the link layer, e.g., with the EtherType <xref target="IANA-IEEE802"/> on an Ethernet link.
+        </t>
+        <t>
+          An implementation that infers the network layer protocol solely from the address family of the prefix to which the Prefix-SID is bound transmits the IPv4 packet as an IPv6 packet (EtherType 0x86DD).
+          The ultimate hop then receives an IPv4 packet that is labeled at the link layer as IPv6, and is likely to discard it.
+        </t>
+      </section>
+
+      <section anchor="problem-explicit-null">
+        <name>Explicit NULL</name>
+        <t>
+          When the Prefix-SID is advertised with both the P-Flag and the E-Flag set, the penultimate hop replaces the Prefix-SID with an Explicit NULL label (<xref target="RFC8667" section="2.1.1.3"/>).
+          The E-Flag is defined as replacing the Prefix-SID with an Explicit NULL value, "0 for IPv4 and 2 for IPv6" (<xref target="RFC8667" section="2.1"/>); <xref target="RFC8666" section="6"/> defines the same behavior for OSPFv3.
+          These specifications do not state whether the value is selected according to the address family of the advertised prefix or according to the network layer protocol of the packet being forwarded.
+        </t>
+        <t>
+          If the value is selected according to the address family of the prefix, the IPv4 packet is sent to the ultimate hop with the IPv6 Explicit NULL label.
+          That label indicates that the forwarding of the packet must be based on the IPv6 header (<xref target="RFC3032" section="2.1"/>), so the ultimate hop is likely to discard the IPv4 packet.
+        </t>
+      </section>
+
+      <section anchor="workarounds">
+        <name>Existing Workarounds</name>
+        <t>
+          A first hop can avoid the ambiguity by imposing an additional label beneath the Prefix-SID that identifies the packet as IPv4, analogous to the second level of labels used by 6PE (<xref target="RFC4798" section="3"/>).
+          That label can be advertised by the egress PE using BGP-LU <xref target="RFC8277"/>, as described in <xref target="I-D.mishra-idr-v4-islands-v6-core-4pe"/>, and can be the IPv4 Explicit NULL label.
+        </t>
+        <t>
+          This approach requires BGP-LU, or an equivalent mechanism, in addition to or instead of plain IPv4 unicast NLRI.
+          It increases the depth of the label stack by one, which matters where the number of labels that can be imposed is constrained (see Maximum SID Depth <xref target="RFC8491"/>).
+          When the IPv4 Explicit NULL label is used, it also forces explicit NULL behavior: every IPv4 packet arrives at the ultimate hop with an MPLS label, even where PHP would otherwise be used.
+        </t>
+      </section>
+
+      <section anchor="unaffected">
+        <name>Unaffected Cases</name>
+        <t>
+          Services in which the bottom-of-stack label is a service label, such as BGP/MPLS IP VPNs <xref target="RFC4364"/> <xref target="RFC4659"/>, are not affected.
+          For such services, the Prefix-SID is not at the bottom of the stack, and the service label identifies the forwarding context, and thereby the payload address family, at the egress PE.
+          IPv6 packets carried over a Prefix-SID bound to an IPv6 prefix are not affected either.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="procedures">
+      <name>Payload Address Family Awareness</name>
+      <t>
+        This section specifies procedures that make the SR-MPLS data plane aware of the payload address family.
+        In terms of <xref target="RFC3032" section="2.2"/>, a Prefix-SID label that is bound to an IPv6 prefix in an SR-MPLSv6 deployment is used for the set of network layer protocols consisting of IPv4 and IPv6, and packets of the two protocols are distinguished by inspection of the network layer header as specified in <xref target="payload-af"/>.
+      </t>
+      <t>
+        The procedures apply to packets that are forwarded using a Prefix-SID that is bound to an IPv6 prefix of the ultimate hop, and that carry no label beneath that Prefix-SID, i.e., the Prefix-SID label has the S bit set when it is popped or replaced.
+        Packets with additional labels beneath the Prefix-SID are processed as specified in <xref target="RFC8660"/> and are not affected by this document.
+      </t>
+      <t>
+        Depending on the configuration of the Prefix-SID, i.e., the P-Flag and the E-Flag <xref target="RFC8667"/>, the payload address family is determined by the penultimate hop (Sections <xref target="implicit-null" format="counter"/> and <xref target="explicit-null" format="counter"/>) or by the ultimate hop (<xref target="first-ultimate"/>).
+      </t>
+
+      <section anchor="payload-af">
+        <name>Determining the Payload Address Family</name>
+        <t>
+          A node determines the payload address family by inspecting the Version field, i.e., the first four bits, of the network layer header that immediately follows the label stack entry with the S bit set.
+          The value 4 indicates IPv4 <xref target="RFC0791"/>, and the value 6 indicates IPv6 <xref target="RFC8200"/>.
+        </t>
+        <t>
+          If the Version field contains any other value, the node <bcp14>MUST NOT</bcp14> apply the procedures in this document, and <bcp14>MUST</bcp14> process the packet as it would in the absence of this document.
+        </t>
+        <t>
+          Inspection of the first nibble beyond the label stack is already commonly performed by LSRs, e.g., for equal-cost multipath (ECMP) load balancing <xref target="RFC4928"/>.
+        </t>
+      </section>
+
+      <section anchor="implicit-null">
+        <name>Implicit NULL</name>
+        <t>
+          This procedure applies when the Prefix-SID of the ultimate hop is advertised with the P-Flag clear, i.e., when the penultimate hop pops the Prefix-SID.
+        </t>
+        <t>
+          The first hop receives an IPv4 packet whose route resolves to the IPv6 /128 loopback address of the ultimate hop.
+          The first hop and the transit nodes apply the PUSH and CONTINUE operations as specified in <xref target="RFC8660"/>, until the packet reaches the penultimate hop.
+        </t>
+        <t>
+          When the penultimate hop pops the Prefix-SID and the label stack becomes empty, the penultimate hop <bcp14>MUST</bcp14> determine the payload address family as specified in <xref target="payload-af"/>.
+        </t>
+        <ul>
+          <li>
+            If the payload is IPv4, the penultimate hop <bcp14>MUST</bcp14> transmit the packet to the ultimate hop as an IPv4 packet.
+            On an Ethernet link, this means that the penultimate hop sets the EtherType to 0x0800 and sends the frame to the link-layer address of the ultimate hop.
+          </li>
+          <li>
+            If the payload is IPv6, the penultimate hop <bcp14>MUST</bcp14> transmit the packet to the ultimate hop as an IPv6 packet, e.g., with EtherType 0x86DD on an Ethernet link.
+          </li>
+        </ul>
+        <t>
+          The ultimate hop thereby receives the packet with a link-layer protocol identifier that matches its network layer header, and processes it for further routing or switching like any other native IPv4 or IPv6 packet.
+        </t>
+      </section>
+
+      <section anchor="explicit-null">
+        <name>Explicit NULL</name>
+        <t>
+          This procedure applies when the Prefix-SID of the ultimate hop is advertised with both the P-Flag and the E-Flag set, i.e., when the penultimate hop replaces the Prefix-SID with an Explicit NULL label (<xref target="RFC8667" section="2.1.1.3"/>).
+        </t>
+        <t>
+          The first hop and the transit nodes behave as described in <xref target="implicit-null"/>.
+          When the penultimate hop replaces a Prefix-SID label that has the S bit set with an Explicit NULL label, it <bcp14>MUST</bcp14> determine the payload address family as specified in <xref target="payload-af"/>, and <bcp14>MUST</bcp14> select the Explicit NULL label according to the payload address family rather than according to the address family of the prefix to which the Prefix-SID is bound:
+        </t>
+        <ul>
+          <li>
+            If the payload is IPv4, the penultimate hop <bcp14>MUST</bcp14> use the IPv4 Explicit NULL label (0).
+          </li>
+          <li>
+            If the payload is IPv6, the penultimate hop <bcp14>MUST</bcp14> use the IPv6 Explicit NULL label (2).
+          </li>
+        </ul>
+        <t>
+          The penultimate hop then forwards the packet to the ultimate hop using the regular IGP forwarding procedures.
+          The ultimate hop thereby receives the packet with the Explicit NULL label that matches the payload, and processes the packet for further routing or switching in its global routing table as specified in <xref target="RFC3032"/>.
+        </t>
+      </section>
+
+      <section anchor="first-ultimate">
+        <name>First Hop and Ultimate Hop</name>
+        <t>
+          The first hop knows the address family of each packet that it receives from a CE.
+          When the first hop is itself the penultimate hop, i.e., when the first hop and the ultimate hop are adjacent, it produces the result of <xref target="implicit-null"/> or <xref target="explicit-null"/> without inspecting the packet: it transmits an IPv4 packet without a label and with the IPv4 link-layer protocol identifier (implicit NULL), or imposes only the IPv4 Explicit NULL label (explicit NULL).
+        </t>
+        <t>
+          When the Prefix-SID is advertised with the P-Flag set and the E-Flag clear, the penultimate hop keeps the Prefix-SID on top of the stack (<xref target="RFC8667" section="2.1.1.3"/>), and the ultimate hop pops it.
+          The action of the ultimate hop after popping a label depends on the instruction associated with the label and on the contents of the packet underneath (<xref target="RFC8660" section="2.10.2"/>); the ultimate hop determines the payload address family as specified in <xref target="payload-af"/> and processes the packet accordingly.
+        </t>
+        <t>
+          <cref anchor="ednote-first-ultimate" source="Editors">
+            The procedures for the first hop and the ultimate hop are to be completed.
+            This includes whether an ultimate hop should accept an IPv4 packet received with the IPv6 Explicit NULL label from a penultimate hop that does not implement this document.
+          </cref>
+        </t>
+      </section>
+    </section>
+
+    <section anchor="topologies">
+      <name>Example Topologies</name>
+      <t>
+        The topologies in this section illustrate SR-MPLSv6 deployments that the procedures in this document need to account for.
+        In each, the core runs IS-IS over IPv6-only point-to-point links, the Prefix-SIDs are attached to the IPv6 loopback addresses of the PEs, and the PEs exchange IPv4 and IPv6 routes over IPv6-only iBGP sessions, with IPv4 NLRI carried as specified in <xref target="RFC8950"/>.
+        The addressing and protocols used in both topologies are summarized in <xref target="tab-addressing"/>.
+      </t>
+      <t>
+        <cref anchor="ednote-ecmp" source="Editors">
+          Behavior in both the ECMP and the non-ECMP cases needs verification.
+        </cref>
+      </t>
+      <t>
+        In <xref target="fig-single-homed"/>, IPv4 traffic from CE1 to CE2 enters the SR-MPLS domain at PE1, which imposes the Prefix-SID of the IPv6 loopback address of PE2.
+        P1 and P2 provide equal-cost paths, and whichever of them forwards a given packet acts as the penultimate hop.
+      </t>
+      <figure anchor="fig-single-homed">
+        <name>Single-Homed CEs, Two P Routers</name>
+        <artwork type="ascii-art"><![CDATA[
+                       SR-MPLS CORE
+                  (IPv6-only IGP: IS-IS)
+
+                             P1
+                          /      \
+                         /        \
+CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
+                         \        /
+                          \      /
+                             P2
+
+           PE1 <-- iBGP overlay (IPv6-only) --> PE2
+]]></artwork>
+      </figure>
+      <t>
+        In <xref target="fig-dual-homed"/>, each CE is dual-homed to a pair of PEs, each PE is connected to both P routers, and the PEs form an iBGP full mesh.
+        The penultimate hop for a given packet is P1 or P2, or, after failures, another node such as a PE of the egress pair.
+      </t>
+      <figure anchor="fig-dual-homed">
+        <name>Dual-Homed CEs, Full Mesh between PEs and P Routers</name>
+        <artwork type="ascii-art"><![CDATA[
+                         SR-MPLS CORE
+                    (IPv6-only IGP: IS-IS)
+
+          +-----+           +-----+           +-----+
+     +----| PE1 |-----------| P1  |-----------| PE3 |----+
+     |    +-----+           +-----+           +-----+    |
+     |       |    \       /    |    \       /    |       |
+  +-----+    |      \   /      |      \   /      |    +-----+
+  | CE1 |    |        X        |        X        |    | CE2 |
+  +-----+    |      /   \      |      /   \      |    +-----+
+     |       |    /       \    |    /       \    |       |
+     |    +-----+           +-----+           +-----+    |
+     +----| PE2 |-----------| P2  |-----------| PE4 |----+
+          +-----+           +-----+           +-----+
+
+  PE1-PE2 <-- iBGP full-mesh overlay (IPv6-only) --> PE3-PE4
+]]></artwork>
+      </figure>
+      <table anchor="tab-addressing">
+        <name>Addressing and Protocols in the Example Topologies</name>
+        <thead>
+          <tr>
+            <th>Connection</th>
+            <th>Addressing / Protocol</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Core links (PE-P, P-P, and PE-PE where present)</td>
+            <td>IPv6-only point-to-point links running IS-IS; carry SR-MPLS</td>
+          </tr>
+          <tr>
+            <td>Access links (PE-CE)</td>
+            <td>Dual-stack (IPv4 and IPv6)</td>
+          </tr>
+          <tr>
+            <td>Overlay (PE-PE)</td>
+            <td>IPv6-only iBGP sessions; IPv4 NLRI with IPv6 next hops <xref target="RFC8950"/></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section anchor="ops">
+      <name>Operational Considerations</name>
+
+      <section anchor="ops-deployment">
+        <name>Deployment</name>
+        <t>
+          The procedures in <xref target="implicit-null"/> and <xref target="explicit-null"/> are performed by the penultimate hop, which is not the node that imposes the Prefix-SID.
+          A first hop therefore cannot, by itself, ensure that IPv4 packets are delivered correctly.
+          Every node that can act as the penultimate hop for the Prefix-SID of an egress PE, including nodes on ECMP paths and on fast-reroute repair paths, needs to implement this document.
+          In <xref target="fig-dual-homed"/>, for example, PE4 becomes the penultimate hop for traffic to PE3 if both links between PE3 and the P routers fail.
+        </t>
+        <t>
+          In a network in which some nodes do not implement this document, IPv4 traffic can be discarded.
+          Operators can avoid this by ensuring that all potential penultimate hops implement this document before carrying IPv4 traffic without an additional label, or by continuing to use one of the approaches described in <xref target="workarounds"/> towards egress PEs for which this cannot be ensured.
+        </t>
+        <t>
+          <cref anchor="ednote-capability" source="Editors">
+            A capability advertisement, e.g., an IGP flag, that would allow a first hop to determine whether the penultimate hops towards an egress PE implement this document is for further study.
+          </cref>
+        </t>
+      </section>
+
+      <section anchor="ops-ipv6-only-links">
+        <name>IPv4 Packets on IPv6-Only Links</name>
+        <t>
+          With the procedure in <xref target="implicit-null"/>, the ultimate hop receives native IPv4 packets on core-facing interfaces that have no IPv4 address.
+          The penultimate hop resolves the link-layer address of the ultimate hop using IPv6 Neighbor Discovery <xref target="RFC4861"/>, so neither an IPv4 address nor ARP is needed on the link.
+          The ultimate hop, however, needs to accept and process IPv4 packets received on such interfaces; implementations that discard IPv4 packets received on interfaces on which IPv4 is not enabled need IPv4 processing to be enabled on the core-facing interfaces of the ultimate hop.
+        </t>
+      </section>
+
+      <section anchor="ops-label-stack-depth">
+        <name>Label Stack Depth</name>
+        <t>
+          Compared to the approaches described in <xref target="workarounds"/>, the procedures in this document carry IPv4 packets with one label fewer.
+          This is beneficial where the Maximum SID Depth <xref target="RFC8491"/> of the first hop limits the number of labels that can be imposed.
+        </t>
+      </section>
+
+      <section anchor="ops-ecmp">
+        <name>Equal-Cost Multipath</name>
+        <t>
+          Transit nodes commonly inspect the first nibble beyond the label stack to select among ECMP paths <xref target="RFC4928"/>.
+          This document does not change that behavior.
+          As noted in <xref target="topologies"/>, behavior in both the ECMP and the non-ECMP cases needs verification.
+        </t>
+        <t>
+          When Entropy Labels <xref target="RFC6790"/> are used, the Prefix-SID is not at the bottom of the label stack.
+          A penultimate hop may, however, pop the Entropy Label Indicator and the Entropy Label in addition to the Prefix-SID (<xref target="RFC6790" section="4.4"/>), which exposes the payload in the same way as described in <xref target="problem-php"/>.
+          The interaction of this document with Entropy Labels is an open issue (<xref target="open-issues"/>).
+        </t>
+      </section>
+
+      <section anchor="ops-oam">
+        <name>Operations, Administration, and Maintenance</name>
+        <t>
+          LSRs that run IPv6 only cannot generate ICMPv4 messages for IPv4 packets whose TTL expires within the SR-MPLS domain (<xref target="RFC7439" section="3.4.1"/>); this document does not address that gap.
+          LSP Ping and Traceroute for SR-MPLS <xref target="RFC8287"/> validate the Prefix-SID itself, but do not exercise the procedures in this document; operators may need to complement them with end-to-end IPv4 probes.
+        </t>
+      </section>
+    </section>
+
+    <section anchor="iana">
+      <name>IANA Considerations</name>
+      <t>
+        This document has no IANA actions.
+      </t>
+    </section>
+
+    <section anchor="security">
+      <name>Security Considerations</name>
+      <t>
+        This document does not introduce any new control plane messages or extensions, and the security considerations of <xref target="RFC8402"/>, <xref target="RFC8660"/>, and <xref target="RFC8667"/> apply.
+      </t>
+      <t>
+        <xref target="RFC8402" section="8.1"/> notes that SR does not introduce any new behavior in the MPLS data plane.
+        This document does introduce a data plane behavior: the penultimate hop, and in some cases the ultimate hop, inspects the first four bits of the network layer header that follows the label stack entry with the S bit set.
+        That inspection is at a fixed offset and of a fixed size, and is comparable to the inspection that LSRs already perform for ECMP <xref target="RFC4928"/>.
+        Packets whose Version field is neither 4 nor 6 are processed as they would be in the absence of this document.
+      </t>
+      <t>
+        The procedures allow IPv4 packets that carry only a Prefix-SID to be delivered into the global routing table of the ultimate hop.
+        This is not a new capability: a node that can inject labeled packets into the SR domain can already achieve the same result by imposing an IPv4 Explicit NULL label beneath the Prefix-SID.
+        As with any SR-MPLS deployment, SR domain boundary routers are required to filter external traffic destined to labels associated with segments within the trusted domain (<xref target="RFC8402" section="8.1"/>).
+      </t>
+    </section>
+
+  </middle>
+
+  <back>
+    <displayreference target="RFC0791" to="RFC791"/>
+
+    <references>
+      <name>References</name>
+      <references>
+        <name>Normative References</name>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.0791.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.3032.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8200.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8402.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8660.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8666.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8667.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8950.xml"/>
+      </references>
+
+      <references>
+        <name>Informative References</name>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.3031.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4364.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4659.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4798.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4861.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4928.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6790.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7439.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7552.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8277.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8287.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8491.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8986.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml3/reference.I-D.mishra-idr-v4-islands-v6-core-4pe.xml"/>
+        <reference anchor="IANA-IEEE802" target="https://www.iana.org/assignments/ieee-802-numbers">
+          <front>
+            <title>IEEE 802 Numbers</title>
+            <author>
+              <organization>IANA</organization>
+            </author>
+          </front>
+        </reference>
+      </references>
+    </references>
+
+    <section anchor="open-issues" removeInRFC="true">
+      <name>Open Issues</name>
+      <t>
+        The following issues are open and are to be resolved in future revisions of this document:
+      </t>
+      <ol>
+        <li>
+          Whether this document updates <xref target="RFC8660"/>, <xref target="RFC8667"/>, and <xref target="RFC8666"/> with respect to the selection of the Explicit NULL label value (<xref target="explicit-null"/>).
+        </li>
+        <li>
+          Whether a capability advertisement is needed so that a first hop can determine that the penultimate hops towards an egress PE implement this document (<xref target="ops-deployment"/>); such an advertisement would require IANA actions.
+        </li>
+        <li>
+          Completion of the procedures for the first hop and the ultimate hop (<xref target="first-ultimate"/>).
+        </li>
+        <li>
+          Verification of behavior in both the ECMP and the non-ECMP cases of the example topologies (<xref target="topologies"/>).
+        </li>
+        <li>
+          Interaction with Entropy Labels <xref target="RFC6790"/>, including a penultimate hop that pops the Entropy Label along with the Prefix-SID (<xref target="ops-ecmp"/>), and with fast-reroute repair paths.
+        </li>
+        <li>
+          Whether the procedures should also apply to IPv6 payloads carried over Prefix-SIDs bound to IPv4 prefixes, and to IPv6-signaled LDP LSPs <xref target="RFC7552"/>.
+        </li>
+        <li>
+          Whether the procedures are enabled by default or only by configuration.
+        </li>
+      </ol>
+    </section>
+
+  </back>
+</rfc>

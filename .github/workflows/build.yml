@@ -1,0 +1,73 @@
+name: Build Internet-Draft
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+
+      - name: Install xml2rfc
+        run: python -m pip install "xml2rfc==3.35.0"
+
+      - name: Render text, HTML, and expanded XML
+        run: make all submit
+
+      - name: Check that the committed plain-text copy is up to date
+        run: make check-readable
+
+      - name: Run idnits
+        run: make idnits
+
+      - name: Upload rendered draft
+        uses: actions/upload-artifact@v7
+        with:
+          name: internet-draft
+          path: |
+            build/
+            !build/readable/
+            !build/site/
+
+      - name: Assemble the editor's copy
+        run: make site
+
+      - name: Upload the editor's copy for GitHub Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/site/
+
+  deploy:
+    # Publish the editor's copy only from main; the github-pages environment
+    # also restricts deployments to main.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
