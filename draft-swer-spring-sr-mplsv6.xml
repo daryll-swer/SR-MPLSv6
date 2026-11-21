@@ -22,8 +22,8 @@ tocInclude="true"
 version="3">
 
   <front>
-    <title abbrev="SR-MPLSv6">
-      Segment Routing over MPLS with IPv6-Only Underlay and Overlay (SR&nbhy;MPLSv6)
+    <title abbrev="IPv4 over IPv6-Only SR-MPLS">
+      IPv4 Traffic over an IPv6-Only Segment Routing MPLS Underlay Network
     </title>
     <seriesInfo name="Internet-Draft" value="draft-swer-spring-sr-mplsv6-00"/>
 
