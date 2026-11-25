@@ -239,10 +239,23 @@ version="3">
           The label therefore identifies the payload as IPv6 even though the packet is IPv4.
           This mismatch may cause the ultimate hop to discard the packet.
         </t>
+      </section>
+
+      <section anchor="problem-uhp">
+        <name>Ultimate Hop Popping</name>
         <t>
-          <cref anchor="ednote-explicit-null-modes" source="Editors">
-            We need to re-write this entire sub-section to support 2 modes of Explicit NULL mechanisms and to support the two forms of Ultimate Hop Popping (with and without explicit NULL)
-          </cref>
+          For IS-IS, when the Prefix-SID is advertised with the P-Flag set and the E-Flag clear, the penultimate hop forwards the packet to the ultimate hop with the label corresponding to that Prefix-SID at the ultimate hop (<xref target="RFC8667" section="2.1.1.3"/>).
+          <xref target="RFC8666" section="6"/> specifies the corresponding behavior for OSPFv3, using the NP-Flag set and the E-Flag clear.
+          The penultimate hop neither pops the label nor replaces it with an Explicit NULL label.
+        </t>
+        <t>
+          In the SR-MPLSv6 case considered here, the ultimate hop is the egress PE, and the received label corresponds to its own Prefix-SID bound to an IPv6 prefix.
+          When this label has the S bit set, popping it exposes the network layer packet.
+          The action after popping depends on the instruction associated with the label and on the contents of the exposed packet (<xref target="RFC8660" section="2.10.2"/>).
+        </t>
+        <t>
+          If the forwarding instruction selects IPv6 processing solely because the Prefix-SID is bound to an IPv6 prefix, an exposed IPv4 packet is passed to the IPv6 forwarding path.
+          As in <xref target="problem-explicit-null"/>, this mismatch may cause the ultimate hop to discard the packet.
         </t>
       </section>
 
@@ -284,7 +297,7 @@ version="3">
         Packets with additional labels beneath the Prefix-SID are processed as specified in <xref target="RFC8660"/> and are not affected by this document.
       </t>
       <t>
-        Depending on the configuration of the Prefix-SID, i.e., the P-Flag and the E-Flag <xref target="RFC8667"/>, the payload address family is determined by the penultimate hop (Sections <xref target="implicit-null" format="counter"/> and <xref target="explicit-null" format="counter"/>) or by the ultimate hop (<xref target="first-ultimate"/>).
+        Depending on the configuration of the Prefix-SID, i.e., the P-Flag and the E-Flag for IS-IS <xref target="RFC8667"/> or the NP-Flag and the E-Flag for OSPFv3 <xref target="RFC8666"/>, the payload address family is determined by the penultimate hop (Sections <xref target="implicit-null" format="counter"/> and <xref target="explicit-null" format="counter"/>) or by the ultimate hop (<xref target="uhp"/>).
       </t>
 
       <section anchor="payload-af">
@@ -350,16 +363,52 @@ version="3">
         </t>
       </section>
 
+      <section anchor="uhp">
+        <name>Ultimate Hop Popping</name>
+        <t>
+          This procedure applies when the Prefix-SID of the egress PE is advertised with the P-Flag set and the E-Flag clear for IS-IS (<xref target="RFC8667" section="2.1.1.3"/>), or with the NP-Flag set and the E-Flag clear for OSPFv3 (<xref target="RFC8666" section="6"/>).
+          The egress PE is the ultimate hop and terminates the Prefix-SID bound to its own IPv6 prefix.
+        </t>
+        <t>
+          The ingress PE and the transit nodes apply the PUSH and CONTINUE operations as specified in <xref target="RFC8660"/>.
+          The penultimate hop forwards the packet with the label corresponding to the Prefix-SID at the ultimate hop, without popping it or replacing it with an Explicit NULL label.
+        </t>
+        <t>
+          When the ultimate hop pops the Prefix-SID label and the label stack becomes empty, it <bcp14>MUST</bcp14> determine the payload address family as specified in <xref target="payload-af"/>.
+          It <bcp14>MUST</bcp14> select the subsequent network layer processing according to the payload address family rather than the address family of the prefix to which the Prefix-SID is bound:
+        </t>
+        <ul>
+          <li>
+            If the payload is IPv4, the ultimate hop <bcp14>MUST</bcp14> process the exposed packet as IPv4 and use its global IPv4 forwarding table for any subsequent IP forwarding lookup.
+          </li>
+          <li>
+            If the payload is IPv6, the ultimate hop <bcp14>MUST</bcp14> process the exposed packet as IPv6 and use its global IPv6 forwarding table for any subsequent IP forwarding lookup.
+          </li>
+        </ul>
+        <t>
+          These requirements specify the network layer processing associated with the NEXT operation described in <xref target="RFC8660" section="2.10.2"/> for the SR-MPLSv6 case considered here.
+        </t>
+      </section>
+
       <section anchor="first-ultimate">
         <name>First Hop and Ultimate Hop</name>
         <t>
           The first hop knows the address family of each packet that it receives from a CE.
-          When the first hop is itself the penultimate hop, i.e., when the first hop and the ultimate hop are adjacent, it produces the result of <xref target="implicit-null"/> or <xref target="explicit-null"/> without inspecting the packet: it transmits an IPv4 packet without a label and with the IPv4 link-layer protocol identifier (implicit NULL), or imposes only the IPv4 Explicit NULL label (explicit NULL).
+          When the first hop and the ultimate hop are adjacent, the first hop is also the penultimate hop.
+          It uses the payload address family already determined at ingress and forwards the packet according to the applicable procedure in Sections <xref target="implicit-null" format="counter"/>, <xref target="explicit-null" format="counter"/>, or <xref target="uhp" format="counter"/>:
         </t>
-        <t>
-          When the Prefix-SID is advertised with the P-Flag set and the E-Flag clear, the penultimate hop keeps the Prefix-SID on top of the stack (<xref target="RFC8667" section="2.1.1.3"/>), and the ultimate hop pops it.
-          The action of the ultimate hop after popping a label depends on the instruction associated with the label and on the contents of the packet underneath (<xref target="RFC8660" section="2.10.2"/>); the ultimate hop determines the payload address family as specified in <xref target="payload-af"/> and processes the packet accordingly.
-        </t>
+        <ul>
+          <li>
+            For Implicit NULL (<xref target="implicit-null"/>), the first hop transmits the packet without an MPLS label and with the link-layer protocol identifier corresponding to the payload address family.
+          </li>
+          <li>
+            For Explicit NULL (<xref target="explicit-null"/>), the first hop imposes only the Explicit NULL label corresponding to the payload address family: label 0 for IPv4 or label 2 for IPv6.
+          </li>
+          <li>
+            For Ultimate Hop Popping (<xref target="uhp"/>), the first hop imposes the label corresponding to the egress PE's Prefix-SID and sends the labeled packet directly to it.
+            The egress PE pops the label and processes the exposed packet as specified in <xref target="uhp"/>.
+          </li>
+        </ul>
         <t>
           <cref anchor="ednote-first-ultimate" source="Editors">
             The procedures for the first hop and the ultimate hop are to be completed.
@@ -492,12 +541,15 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
         <t>
           The procedures in <xref target="implicit-null"/> and <xref target="explicit-null"/> are performed by the penultimate hop, which is not the node that imposes the Prefix-SID.
           A first hop therefore cannot, by itself, ensure that IPv4 packets are delivered correctly.
-          Every node that can act as the penultimate hop for the Prefix-SID of an egress PE, including nodes on ECMP paths and on fast-reroute repair paths, needs to implement this document.
+          For these procedures, every node that can act as the penultimate hop for the Prefix-SID of an egress PE, including nodes on ECMP paths and on fast-reroute repair paths, needs to implement this document.
           In <xref target="fig-dual-homed"/>, for example, PE4 becomes the penultimate hop for traffic to PE3 if both links between PE3 and the P routers fail.
         </t>
         <t>
           In a network in which some nodes do not implement this document, IPv4 traffic can be discarded.
-          Operators can avoid this by ensuring that all potential penultimate hops implement this document before carrying IPv4 traffic without an additional label, or by continuing to use one of the approaches described in <xref target="workarounds"/> towards egress PEs for which this cannot be ensured.
+          For the procedures in Sections <xref target="implicit-null" format="counter"/> and <xref target="explicit-null" format="counter"/>, operators can avoid this by ensuring that all potential penultimate hops implement this document before carrying IPv4 traffic without an additional label, or by continuing to use one of the approaches described in <xref target="workarounds"/> towards egress PEs for which this cannot be ensured.
+        </t>
+        <t>
+          For the procedure in <xref target="uhp"/>, the egress PE needs to support network layer identification and processing at the ultimate hop.
         </t>
         <t>
           <cref anchor="ednote-capability" source="Editors">
