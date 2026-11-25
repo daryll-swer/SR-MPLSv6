@@ -1,0 +1,23 @@
+name: Test paired PR auto-merge
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/*paired_pr_automerge.py'
+      - '.github/scripts/verify-checked-out-revision.sh'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/*paired-pr-automerge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run controller unit tests
+        run: python3 -B -m unittest discover -s .github/scripts -v
