@@ -49,8 +49,11 @@ gh variable set PAIRED_PR_AUTOMERGE -R daryll-swer/SR-MPLSv6 < paired-pr-pins.js
 
 Review new pins and CI evidence before updating the variable after a head,
 base or content change. Clear the variable or disable the controller workflow
-to disarm the pair. Before enabling a controller that has completed a pair,
-replace the old variable with the newly reviewed pins or clear it.
+to disarm future runs. To stop immediately, also cancel any queued or running
+controller jobs and verify the parent PR state. An active run may already have
+read the variable or sent a merge request. Before enabling a controller that
+has completed a pair, replace the old variable with the newly reviewed pins
+or clear it.
 
 ## Monitor and recover
 

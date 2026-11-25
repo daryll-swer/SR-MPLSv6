@@ -129,9 +129,15 @@ class GitHub:
         require(repo in (PARENT, FORK), "Unexpected repository")
         require(method == "GET" or (repo == PARENT and not self.dry_run and bool(self.token)),
                 "Repository write forbidden")
+        # GitHub removed merge_commit_sha in the 2026-03-10 API version.
+        # https://docs.github.com/en/rest/about-the-rest-api/breaking-changes
+        # Keep the older version for PR data. The
+        # newer dispatch response returns the workflow run ID in the body.
+        dispatch = method == "POST" and path == f"actions/workflows/{BUILD}/dispatches"
         headers = {
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2026-03-10",
+            "Cache-Control": "no-cache",
+            "X-GitHub-Api-Version": "2026-03-10" if dispatch else "2022-11-28",
             "User-Agent": "paired-pr-automerge",
         }
         if repo == PARENT and self.token:
@@ -169,6 +175,8 @@ def pull(api: GitHub, pins: Pins, repo: str) -> dict[str, Any]:
             and result["head"]["sha"] == pins.head_sha, "PR head differs from pinned topic")
     require(type(result["merged"]) is bool and result["state"] in ("open", "closed")
             and (not result["merged"] or result["state"] == "closed"), "Unknown PR state")
+    if result["merged"] or (repo == PARENT and result["mergeable"] is True):
+        require("merge_commit_sha" in result, "GitHub did not return the PR merge commit SHA")
     return result
 
 

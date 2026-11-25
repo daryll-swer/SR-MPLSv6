@@ -252,6 +252,13 @@ class ReconcileTests(TestCase):
         self.assertIn("Would merge parent PR", fixture.reconcile())
         self.assertEqual(fixture.writes, [])
 
+    def test_missing_pr_merge_sha_blocks_writes(self):
+        for target in ("parent", "fork"):
+            with self.subTest(pr=target):
+                fixture = Fixture()
+                del getattr(fixture, target)["merge_commit_sha"]
+                self.assert_blocked_without_writes(fixture, "did not return the PR merge commit SHA")
+
     def test_incomplete_ci_waits(self):
         for status in controller.PENDING:
             with self.subTest(status=status):
@@ -394,6 +401,13 @@ class TransportTests(TestCase):
         with self.assertRaisesRegex(controller.Blocked, "write forbidden"):
             reader.api_request(PARENT, "pulls/19/merge", "PUT")
         self.assertIsNone(reader.api_request(FORK, "pulls/11").get_header("Authorization"))
+
+    def test_dispatch_uses_run_id_api_while_pr_uses_merge_commit_api(self):
+        writer = controller.GitHub("secret", False)
+        pull_request = writer.api_request(FORK, "pulls/11")
+        self.assertEqual(pull_request.get_header("X-github-api-version"), "2022-11-28")
+        dispatch = writer.api_request(PARENT, f"actions/workflows/{BUILD}/dispatches", "POST")
+        self.assertEqual(dispatch.get_header("X-github-api-version"), "2026-03-10")
 
     def test_non200_is_blocked_without_logging_body(self):
         reader = controller.GitHub("secret", True)
