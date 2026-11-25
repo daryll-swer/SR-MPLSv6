@@ -32,7 +32,7 @@ version="3">
       <address>
         <email>daryll@swernetworks.com</email>
         <email>contact@daryllswer.com</email>
-        <uri>https://www.swernetworks.com</uri>
+        <uri>https://www.linkedin.com/in/daryllswer/</uri>
       </address>
     </author>
 
@@ -45,6 +45,7 @@ version="3">
           <country>United States of America</country>
         </postal>
         <email>bryton@cloudflare.com</email>
+        <uri>https://www.linkedin.com/in/brytonjherdes/</uri>
       </address>
     </author>
 
@@ -125,7 +126,7 @@ version="3">
       <t>
         This document introduces layer 3 (network layer) awareness into the SR-MPLS data plane.
         Depending on the network configuration and topology, the first hop, penultimate hop, or ultimate hop inspects the payload's network layer header to determine its address family and applies the corresponding forwarding procedures.
-        <xref target="problem"/> describes the problem in detail, <xref target="procedures"/> specifies these procedures, and <xref target="topologies"/> illustrates the reference topologies they address.
+        <xref target="problem"/> describes the problem in detail, <xref target="procedures"/> specifies procedures, <xref target="te-router-id"/> specifies IPv6 TE Router ID requirements, and <xref target="topologies"/> illustrates the reference topologies they address.
       </t>
 
       <section anchor="reqs-lang">
@@ -214,7 +215,7 @@ version="3">
           The IGP provides IPv6 reachability to the ultimate hop, but this does not by itself establish support for transmitting an unlabeled IPv4 packet over the associated outgoing adjacency.
         </t>
         <t>
-          The mechanisms specified for integrated IS-IS <xref target="RFC5308"/>, multi-topology IS-IS <xref target="RFC5120"/>, and OSPFv3 address families <xref target="RFC5838"/> do not define IPv4 routing through IPv6 next hops comparable to the capability provided by <xref target="RFC8950"/> for BGP, as discussed in <xref target="I-D.ietf-intarea-v4-via-v6" section="3.3"/>.
+          The mechanisms specified for IS-IS <xref target="RFC5308"/>, multi-topology IS-IS <xref target="RFC5120"/>, and OSPFv3 address families <xref target="RFC5838"/> do not define IPv4 routing through IPv6 next hops comparable to the capability provided by <xref target="RFC8950"/> for BGP, as discussed in <xref target="I-D.ietf-intarea-v4-via-v6" section="3.3"/>.
           Support for both address families within an IGP therefore does not imply support for IPv4-via-IPv6 forwarding.
         </t>
         <t>
@@ -237,6 +238,11 @@ version="3">
           That label specifies that, after it is popped, forwarding is based on the IPv6 header (<xref target="RFC3032" section="2.1"/>).
           The label therefore identifies the payload as IPv6 even though the packet is IPv4.
           This mismatch may cause the ultimate hop to discard the packet.
+        </t>
+        <t>
+          <cref anchor="ednote-explicit-null-modes" source="Editors">
+            We need to re-write this entire sub-section to support 2 modes of Explicit NULL mechanisms and to support the two forms of Ultimate Hop Popping (with and without explicit NULL)
+          </cref>
         </t>
       </section>
 
@@ -361,6 +367,38 @@ version="3">
           </cref>
         </t>
       </section>
+    </section>
+
+    <section anchor="te-router-id">
+      <name>Traffic Engineering Router ID</name>
+      <t>
+        Every SR-MPLSv6 node <bcp14>MUST</bcp14> support the use of a stable, routable IPv6 address as its sole Traffic Engineering (TE) Router ID.
+        For IS-IS, the IPv6 TE Router ID TLV is specified in <xref target="RFC6119" section="4.1"/>.
+        For OSPFv3, the Router IPv6 Address TLV is specified in <xref target="RFC5329" section="3"/>.
+        The address-selection and advertisement rules of the corresponding specification apply.
+      </t>
+      <t>
+        An SR-MPLSv6 node <bcp14>MUST</bcp14> support operation of its implemented TE functions using IPv6 TE Router IDs and IPv6-only infrastructure addressing within the SR-MPLSv6 domain, including when steering IPv4 traffic.
+        This requirement applies to SR Policy-based traffic engineering <xref target="RFC9256"/>, BGP Egress Peer Engineering (EPE) <xref target="RFC9087"/>, and other TE functions supported by the node in its role.
+        Any IP-based control-plane communication required by those functions within the domain <bcp14>MUST</bcp14> support IPv6-only control plane.
+        These requirements do not mandate that every node implement every TE function.
+      </t>
+      <t>
+        The address family of the traffic being steered is independent of the address family used for TE identification and infrastructure addressing.
+        <xref target="RFC9256" section="2.1"/> permits IPv6 addresses to identify SR Policy headends and endpoints.
+        Section <xref target="RFC9256" section="8.4" sectionFormat="bare"/> specifies service-route steering for both IPv4 and IPv6 traffic over SR-MPLS and SRv6.
+      </t>
+      <t>
+        SRv6 provides a corresponding example of IPv4 service delivery over IPv6 infrastructure.
+        <xref target="RFC9252" section="5"/> specifies IPv6 BGP next hops and steering into SRv6 Policies; Sections <xref target="RFC9252" section="5.1" sectionFormat="bare"/> and <xref target="RFC9252" section="5.3" sectionFormat="bare"/> cover IPv4 VPN and global IPv4 services, respectively.
+        <xref target="RFC8986" section="5.1"/> specifies encapsulation of IPv4 traffic into an SRv6 Policy, and Section <xref target="RFC8986" section="4.7" sectionFormat="bare"/> specifies decapsulation and lookup in an IPv4 forwarding table.
+      </t>
+      <t>
+        The IPv6 TE Router ID is distinct from the OSPFv3 Router ID and the BGP Identifier.
+        Those protocol fields retain their existing formats and semantics.
+        The OSPFv3 Router ID is a 32-bit value that can be assigned administratively (<xref target="RFC5340" section="C.1"/>); the BGP Identifier is a four-octet, unsigned, non-zero integer (<xref target="RFC6286" section="2.1"/>).
+        Neither requires an IPv4 interface address.
+      </t>
     </section>
 
     <section anchor="topologies">
@@ -545,6 +583,8 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.0791.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.3032.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5329.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6119.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8200.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8402.xml"/>
@@ -552,6 +592,7 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8666.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8667.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8950.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9256.xml"/>
       </references>
 
       <references>
@@ -564,7 +605,21 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.4928.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5120.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5308.xml"/>
+        <!-- The RFC 5340 front page credits Lindem as editor; bibxml omits the role. -->
+        <reference anchor="RFC5340" target="https://www.rfc-editor.org/info/rfc5340">
+          <front>
+            <title>OSPF for IPv6</title>
+            <author fullname="R. Coltun" initials="R." surname="Coltun"/>
+            <author fullname="D. Ferguson" initials="D." surname="Ferguson"/>
+            <author fullname="J. Moy" initials="J." surname="Moy"/>
+            <author fullname="A. Lindem" initials="A." surname="Lindem" role="editor"/>
+            <date month="July" year="2008"/>
+          </front>
+          <seriesInfo name="RFC" value="5340"/>
+          <seriesInfo name="DOI" value="10.17487/RFC5340"/>
+        </reference>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.5838.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6286.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.6790.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7439.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.7552.xml"/>
@@ -572,6 +627,8 @@ CE1 ----- PE1 ----------<          >---------- PE2 ----- CE2
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8287.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8491.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.8986.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9087.xml"/>
+        <xi:include href="https://bib.ietf.org/public/rfc/bibxml/reference.RFC.9252.xml"/>
         <xi:include href="https://datatracker.ietf.org/doc/bibxml3/draft-ietf-intarea-v4-via-v6-10.xml"/>
         <xi:include href="https://bib.ietf.org/public/rfc/bibxml3/reference.I-D.mishra-idr-v4-islands-v6-core-4pe.xml"/>
         <reference anchor="IANA-IEEE802" target="https://www.iana.org/assignments/ieee-802-numbers">
